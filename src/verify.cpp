@@ -1,5 +1,6 @@
 #include "verify.hpp"
-
+#include "sqrt_decomposition.hpp"
+#include "segment_tree.hpp"
 #include "prefix_sum_1d.hpp"
 #include "prefix_sum_2d.hpp"
 #include "precomputed_rmq.hpp"
@@ -280,6 +281,233 @@ bool verify_random_cases() {
 
 } 
 
+bool verify_sqrt_rsq() {
+    const std::vector<std::int64_t> data{3, 1, 4, 1, 5, 9, 2, 6};
+    OperationCounter counter;
+    auto structure = make_sqrt_rsq(data, counter);
+
+    if (counter.get() != data.size()) {
+        std::cerr << "verify sqrt_rsq: неверное число операций построения\n";
+        return false;
+    }
+
+    const std::vector<RangeQuery> queries{{0, 7}, {2, 5}, {4, 4}, {1, 3}};
+
+    for (const RangeQuery& query : queries) {
+        counter.reset();
+
+        const std::int64_t got = structure.query(query.left, query.right, counter);
+        const std::int64_t expected = brute_sum_1d(data, query.left, query.right);
+
+        if (got != expected) {
+            std::cerr << "verify sqrt_rsq: неверный ответ\n";
+            return false;
+        }
+
+        if (counter.get() == 0) {
+            std::cerr << "verify sqrt_rsq: ожидалась хотя бы одна операция combine\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool verify_sqrt_rmq() {
+    const std::vector<std::int64_t> data{9, 3, 7, 1, 8, 2, 6, 5};
+    OperationCounter counter;
+    auto structure = make_sqrt_rmq(data, counter);
+
+    if (counter.get() != data.size()) {
+        std::cerr << "verify sqrt_rmq: неверное число операций построения\n";
+        return false;
+    }
+
+    const std::vector<RangeQuery> queries{{0, 7}, {1, 4}, {3, 3}, {2, 6}};
+
+    for (const RangeQuery& query : queries) {
+        counter.reset();
+
+        const std::int64_t got = structure.query(query.left, query.right, counter);
+        const std::int64_t expected = brute_min_1d(data, query.left, query.right);
+
+        if (got != expected) {
+            std::cerr << "verify sqrt_rmq: неверный минимум\n";
+            return false;
+        }
+
+        if (counter.get() == 0) {
+            std::cerr << "verify sqrt_rmq: ожидалась хотя бы одна операция combine\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool verify_sqrt_random_cases() {
+    std::mt19937 rng(123);
+    std::uniform_int_distribution<int> value_dist(-30, 30);
+
+    for (int trial = 0; trial < 40; ++trial) {
+        const std::size_t n = 4 + static_cast<std::size_t>(trial % 12);
+
+        std::vector<std::int64_t> data(n);
+        for (std::int64_t& value : data) {
+            value = value_dist(rng);
+        }
+
+        OperationCounter counter;
+        auto rsq = make_sqrt_rsq(data, counter);
+        auto rmq = make_sqrt_rmq(data, counter);
+
+        std::uniform_int_distribution<std::size_t> index_dist(0, n - 1);
+
+        for (int query_trial = 0; query_trial < 30; ++query_trial) {
+            std::size_t left = index_dist(rng);
+            std::size_t right = index_dist(rng);
+
+            if (left > right) {
+                std::swap(left, right);
+            }
+
+            counter.reset();
+
+            const std::int64_t sum_got = rsq.query(left, right, counter);
+            const std::int64_t sum_expected = brute_sum_1d(data, left, right);
+
+            if (sum_got != sum_expected) {
+                std::cerr << "verify random sqrt_rsq: ошибка\n";
+                return false;
+            }
+
+            counter.reset();
+
+            const std::int64_t min_got = rmq.query(left, right, counter);
+            const std::int64_t min_expected = brute_min_1d(data, left, right);
+
+            if (min_got != min_expected) {
+                std::cerr << "verify random sqrt_rmq: ошибка\n";
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool verify_segment_tree_rsq() {
+    std::vector<std::int64_t> data{3, 1, 4, 1, 5, 9, 2, 6};
+    OperationCounter counter;
+
+    SegmentTreeRsq structure(data, counter);
+
+    const std::size_t n = data.size();
+
+    if (n > 1 && counter.get() != n - 1) {
+        std::cerr << "verify segment_tree_rsq: ожидалось " << (n - 1)
+                  << " операций построения, получено " << counter.get() << '\n';
+        return false;
+    }
+
+    const std::vector<RangeQuery> queries{{0, 7}, {2, 5}, {4, 4}, {1, 3}};
+
+    for (const RangeQuery& query : queries) {
+        counter.reset();
+        const std::int64_t got = structure.query(query.left, query.right, counter);
+        const std::int64_t expected = brute_sum_1d(data, query.left, query.right);
+
+        if (got != expected) {
+            std::cerr << "verify segment_tree_rsq: неверный ответ на запросе\n";
+            return false;
+        }
+    }
+
+    const std::vector<PointUpdate> updates{{2, 10}, {0, -5}, {7, 0}};
+
+    for (const PointUpdate& update : updates) {
+        data[update.index] = update.value;
+
+        counter.reset();
+        structure.update(update.index, update.value, counter);
+
+        if (counter.get() == 0) {
+            std::cerr << "verify segment_tree_rsq: ожидалась хотя бы одна операция update\n";
+            return false;
+        }
+    }
+
+    for (const RangeQuery& query : queries) {
+        counter.reset();
+
+        const std::int64_t got = structure.query(query.left, query.right, counter);
+        const std::int64_t expected = brute_sum_1d(data, query.left, query.right);
+
+        if (got != expected) {
+            std::cerr << "verify segment_tree_rsq: неверный ответ после обновлений\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool verify_segment_tree_random_cases() {
+    std::mt19937 rng(321);
+    std::uniform_int_distribution<int> value_dist(-40, 40);
+
+    for (int trial = 0; trial < 35; ++trial) {
+        const std::size_t n = 3 + static_cast<std::size_t>(trial % 10);
+
+        std::vector<std::int64_t> data(n);
+        for (std::int64_t& value : data) {
+            value = value_dist(rng);
+        }
+
+        OperationCounter counter;
+        SegmentTreeRsq structure(data, counter);
+
+        std::uniform_int_distribution<std::size_t> index_dist(0, n - 1);
+
+        for (int step = 0; step < 50; ++step) {
+            if (step % 2 == 0) {
+                std::size_t left = index_dist(rng);
+                std::size_t right = index_dist(rng);
+
+                if (left > right) {
+                    std::swap(left, right);
+                }
+
+                counter.reset();
+
+                const std::int64_t got = structure.query(left, right, counter);
+                const std::int64_t expected = brute_sum_1d(data, left, right);
+
+                if (got != expected) {
+                    std::cerr << "verify random segment_tree_rsq: ошибка запроса\n";
+                    return false;
+                }
+            } else {
+                const std::size_t index = index_dist(rng);
+                const std::int64_t value = value_dist(rng);
+
+                data[index] = value;
+
+                counter.reset();
+                structure.update(index, value, counter);
+
+                if (counter.get() == 0) {
+                    std::cerr << "verify random segment_tree_rsq: ошибка update\n";
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+
 bool run_verify() {
     if (!verify_prefix_sum_1d()) {
         return false;
@@ -296,8 +524,28 @@ bool run_verify() {
     if (!verify_random_cases()) {
         return false;
     }
+    if (!verify_sqrt_rsq()) {
+        return false;
+    }
 
-    std::cout << "verify: OK (prefix_sum_1d, prefix_sum_2d, precomputed_rmq)\n";
+    if (!verify_sqrt_rmq()) {
+        return false;
+    }
+
+    if (!verify_sqrt_random_cases()) {
+        return false;
+    }
+
+    if (!verify_segment_tree_rsq()) {
+        return false;
+    }
+
+    if (!verify_segment_tree_random_cases()) {
+        return false;
+    }
+
+    std::cout << "verify: OK (prefix_sum_1d, prefix_sum_2d, precomputed_rmq, "
+                 "sqrt_rsq, sqrt_rmq, segment_tree_rsq)\n";
     return true;
 }
 
