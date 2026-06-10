@@ -26,10 +26,10 @@ struct PointUpdate {
 struct BenchmarkResult {
     std::string structure_name;
     std::size_t n{0};
-    std::size_t m{0};  // 0 для одномерных структур
+    std::size_t m{0};  
     std::uint64_t build_ops{0};
     double avg_query_ops{0.0};
     double avg_update_ops{0.0};
 };
 
-}  // namespace semga67
+}  
