@@ -1,0 +1,2 @@
+void verify_placeholder() {
+}
