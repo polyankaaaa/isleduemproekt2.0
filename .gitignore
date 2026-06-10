@@ -1,0 +1,15 @@
+build/
+.DS_Store
+__MACOSX/
+
+results/*.csv
+results/*.png
+results/plots/
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+.vscode/
+.idea/
